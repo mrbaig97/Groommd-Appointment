@@ -36,6 +36,6 @@ const bookingSchema = new mongoose.Schema(
 );
 
 // Create the Service model
-const BookingeModel = mongoose.model("Booking", bookingSchema);
+const BookingModel = mongoose.model("Booking", bookingSchema);
 
-module.exports = BookingeModel;
+module.exports = BookingModel;

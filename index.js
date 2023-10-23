@@ -6,8 +6,9 @@ const path = require("path");
 const userRoutes = require("./api/user");
 const serviceRoutes = require('./api/services');
 const subserviceRoutes = require('./api/subServices');
+const bookingRoutes = require('./api/booking');
 
-mongoose.connect("mongodb://192.168.56.1:27017/groommd", (err, data) => {
+mongoose.connect("mongodb+srv://mrbaigdev:4qauLuS5HAQpZRYD@notification.ta4azjv.mongodb.net/", (err, data) => {
   if (err) { 
     console.log(err)
     console.log("Database connection lost!"); }
@@ -27,5 +28,6 @@ app.get("/", (req, res) => {
 app.use('/api', serviceRoutes);
 app.use("/", userRoutes);
 app.use('/', subserviceRoutes);
+app.use('/', bookingRoutes);
 
 app.listen(5000, () => console.log("Server is running at port 5000"));

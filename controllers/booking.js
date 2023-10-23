@@ -1,6 +1,94 @@
-const BookingeModel = require("../models/booking");
+const BookingModel = require("../models/booking");
 const SubserviceModel = require("../models/subServices");
 const UserModel = require("../models/user");
+
+
+
+async function fetchDuration(subserviceId) {
+    try {
+        const subservice = await SubserviceModel.findById(subserviceId);
+        if (subservice) {
+            return subservice.duration;
+        } else {
+            return null; // Subservice not found
+        }
+    } catch (error) {
+        console.error("Error fetching duration:", error);
+        return null; // Handle the error as needed
+    }
+}
+
+exports.getBusinessTimingsAndGenerateSlots = async (req, res) => {
+    const { barberId, subserviceId, userId } = req.body;
+
+    if (!barberId || !subserviceId) {
+        return res.status(400).json({ message: "Missing barberId or subserviceId in the request body" });
+    }
+
+    const duration = await fetchDuration(subserviceId); // Fetch duration using the subserviceId
+
+    if (duration === null) {
+        return res.status(404).json({ message: "Subservice not found or duration not available" });
+    }
+
+    try {
+        const user = await UserModel.findById(barberId);
+        if (user) {
+            const businessTimings = user.businessTimings;
+            if (businessTimings) {
+                const slots = [];
+
+                businessTimings.forEach((timing) => {
+                    if (timing.isOpen) {
+                        const startHour = parseInt(timing.startHour);
+                        const startMinute = parseInt(timing.startMinute);
+                        const endHour = parseInt(timing.endHour);
+                        const endMinute = parseInt(timing.endMinute);
+                        let currentHour = startHour;
+                        let currentMinute = startMinute;
+
+                        while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
+                            let slotEndHour = currentHour;
+                            let slotEndMinute = currentMinute + duration;
+
+                            if (slotEndMinute >= 60) {
+                                slotEndHour += Math.floor(slotEndMinute / 60);
+                                slotEndMinute %= 60;
+                            }
+
+                            slots.push({
+                                barberId: barberId,
+                                userId: userId,
+                                subserviceId: subserviceId,
+                                startHour: currentHour.toString(),
+                                startMinute: currentMinute.toString(),
+                                endHour: slotEndHour.toString(),
+                                endMinute: slotEndMinute.toString(),
+                            });
+
+                            currentHour = slotEndHour;
+                            currentMinute = slotEndMinute;
+                        }
+                    }
+                });
+
+                res.status(200).json({
+                    message: " slots retrieved successfully",
+                    // businessTimings,
+                    slots,
+                });
+            } else {
+                res.status(404).json({ message: "Business timings not available for the user" });
+            }
+        } else {
+            res.status(404).json({ message: "User not found" });
+        }
+    } catch (error) {
+        console.error("Error fetching business timings:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
 
 exports.createBooking = async (req, res) => {
     try {
@@ -20,7 +108,7 @@ exports.createBooking = async (req, res) => {
         }
 
         // Create a new booking
-        const newBooking = new BookingeModel({
+        const newBooking = new BookingModel({
             barberId,
             userId,
             service: serviceId,
@@ -42,79 +130,77 @@ exports.createBooking = async (req, res) => {
     }
 };
 
-exports.getAvailability = async (req, res) => {
+exports.getAvailableSlots = async (req, res) => {
     try {
-        const { barberId, date, serviceId, day } = req.body
-        const serviceData = await SubserviceModel.findById(serviceId)
-        const barberData = await UserModel.findById(barberId)
-        const isAlreadyBooked = await BookingeModel.find({ barberId, date })
-        if (isAlreadyBooked.length == 0) {
+        const { barberId, date, serviceId, day } = req.body;
+        const serviceData = await SubserviceModel.findById(serviceId);
+        const barberData = await UserModel.findById(barberId);
 
-
-            const timing = barberData.businessTimings.filter((item) => {
-                return item.day == day
-            })[0]
-            const slots = (((timing.endHour - timing.startHour) * 60) + (timing.startMinute + timing.endMinute)) / duration
-            const myAvailabilities = []
-            for (var i = 0; i < slots; i++) {
-                ///9:00 6:00 duration 30 
-                if (i == 0) {
-
-                    myAvailabilities.push(
-                        {
-                            startHour: timing.startHour,
-                            startMinute: timing.startMinute,
-                            endHour: parseInt((timing.startMinute + duration / 60)) + timing.startHour,
-                            endMinute: timing.startMinute + duration % 60,
-                        }
-                    )
-                } else {
-                    myAvailabilities.push(
-                        {
-                            startHour: myAvailabilities[i - 2].endHour,
-                            startMinute: myAvailabilities[i - 2].endMinute,
-                            endHour: parseInt((timing.startMinute + (duration * i) / 60)) + timing.startHour,
-                            endMinute: timing.startMinute + (duration * i) % 60,
-                        }
-                    )
-                }
-            }
-
-        } else {
-            const timing = barberData.businessTimings.filter((item) => {
-                return item.day == day
-            })[0]
-            const barberTime = (((timing.endHour - timing.startHour) * 60) + (timing.startMinute + timing.endMinute))
-            var bookedTime = 0
-            isAlreadyBooked.map((item) => {
-                bookedTime += (((item.endHour - item.startHour) * 60) + (item.startMinute + item.endMinute))
-            })
-            const slots = (barberTime - bookedTime) / duration
-            const myAvailabilities = []
-            for (var i = 0; i < slots; i++) {
-
-                var startHour, startMinute, endHour, endMinute;
-                if (i == 0) {
-
-
-
-                    startHour = timing.startHour
-                    startMinute = timing.startMinute
-                    endHour = parseInt((timing.startMinute + duration / 60)) + timing.startHour
-                    endMinute = timing.startMinute + duration % 60
-
-
-                } else {
-                    startHour = myAvailabilities[i - 2].endHour
-                    startMinute = myAvailabilities[i - 2].endMinute
-                    endHour = parseInt((timing.startMinute + (duration * i) / 60)) + timing.startHour
-                    endMinute = timing.startMinute + (duration * i) % 60
-
-                }
-                // yahan logic lgani hai k agr koi time booked time se clash ho raha ho tw kia kren 
-                
-                myAvailabilities.push({ startHour, startMinute, endHour, endMinute })
-            }
+        if (!barberData) {
+            return res.status(404).json({ message: "Barber not found" });
         }
-    } catch (err) { }
-}
+
+        const timing = barberData.businessTimings.find((item) => item.day === day);
+        if (!timing) {
+            return res.status(404).json({ message: "Business timings not found for this day" });
+        }
+
+        const duration = serviceData.duration; // Use the service's duration if available, or set your default duration.
+
+        const existingBookings = await BookingModel.find({ barberId, date });
+
+        const bookedSlots = [];
+        existingBookings.forEach((item) => {
+            const startHour = parseInt(item.startHour);
+            const startMinute = parseInt(item.startMinute);
+            const endHour = parseInt(item.endHour);
+            const endMinute = parseInt(item.endMinute);
+            // Convert booking time to minutes
+            const startMinutes = startHour * 60 + startMinute;
+            const endMinutes = endHour * 60 + endMinute;
+            bookedSlots.push({ startMinutes, endMinutes });
+        });
+
+        const barberStartMinutes = parseInt(timing.startHour) * 60 + parseInt(timing.startMinute);
+        const barberEndMinutes = parseInt(timing.endHour) * 60 + parseInt(timing.endMinute);
+        
+        const availableSlots = [];
+        let currentMinutes = barberStartMinutes;
+        
+        // Iterate through the available time slots and check if they are booked
+        while (currentMinutes + duration <= barberEndMinutes) {
+            const slotEndMinutes = currentMinutes + duration;
+            let isBooked = false;
+
+            // Check if the slot overlaps with any booked slots
+            for (const bookedSlot of bookedSlots) {
+                if (currentMinutes < bookedSlot.endMinutes && slotEndMinutes > bookedSlot.startMinutes) {
+                    isBooked = true;
+                    break;
+                }
+            }
+
+            if (!isBooked) {
+                // Convert minutes back to hours and minutes
+                const startHour = Math.floor(currentMinutes / 60);
+                const startMinute = currentMinutes % 60;
+                const endHour = Math.floor(slotEndMinutes / 60);
+                const endMinute = slotEndMinutes % 60;
+
+                availableSlots.push({
+                    startHour: startHour.toString().padStart(2, '0'),
+                    startMinute: startMinute.toString().padStart(2, '0'),
+                    endHour: endHour.toString().padStart(2, '0'),
+                    endMinute: endMinute.toString().padStart(2, '0'),
+                });
+            }
+            
+            currentMinutes += duration;
+        }
+
+        res.status(200).json({ message: "Available slots retrieved successfully", availableSlots });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
