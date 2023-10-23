@@ -7,9 +7,11 @@ const userRoutes = require("./api/user");
 const serviceRoutes = require('./api/services');
 const subserviceRoutes = require('./api/subServices');
 
-mongoose.connect("mongodb+srv://mrbaigdev:4qauLuS5HAQpZRYD@notification.ta4azjv.mongodb.net/", (err, data) => {
-  if (err) throw new Error("Database connection lost!");
-  console.log("DB Connected!");
+mongoose.connect("mongodb://192.168.56.1:27017/groommd", (err, data) => {
+  if (err) { 
+    console.log(err)
+    console.log("Database connection lost!"); }
+  else console.log("DB Connected!");
 });
 
 app.use(cors());

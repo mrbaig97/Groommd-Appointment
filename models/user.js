@@ -18,18 +18,20 @@ const userSchema = new mongoose.Schema(
     shopname: String, // Specific to barbers
     businessTimings:
 
-    [{
-      day: {
-        type: String,
-        enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-      },
-      isOpen: Boolean,
-      startTime: String,
-      endTime: String,
+      [{
+        day: {
+          type: String,
+          enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+        },
+        isOpen: Boolean,
+        startHour: { type: String },
+        startMinute: { type: String, default: "00" },
+        endHour: { type: String },
+        endMinute: { type: String, default: "00" },
 
 
-}], // Specific to barbers
-    services:[
+      }], // Specific to barbers
+    services: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Service", // Assuming you have a Service model
@@ -47,7 +49,7 @@ const userSchema = new mongoose.Schema(
     },
     timestamps: true, // This option will automatically add createdAt and updatedAt timestamps
   }
- 
+
 );
 
 const UserModel = mongoose.model("User", userSchema);
