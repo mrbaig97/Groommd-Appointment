@@ -4,28 +4,33 @@ const UserModel = require("../models/user");
 
 
 
-async function fetchDuration(subserviceId) {
+async function fetchTotalDuration(serviceIds) {
     try {
-        const subservice = await SubserviceModel.findById(subserviceId);
-        if (subservice) {
-            return subservice.duration;
-        } else {
-            return null; // Subservice not found
+        const services = await SubserviceModel.find({ _id: { $in: serviceIds } });
+
+        if (services.length === 0) {
+            return 0; // No services found, so total duration is 0
         }
+
+        // Calculate the total duration by summing the durations of all services
+        const totalDuration = services.reduce((acc, service) => {
+            return acc + service.duration;
+        }, 0);
+
+        return totalDuration;
     } catch (error) {
-        console.error("Error fetching duration:", error);
+        console.error("Error fetching durations:", error);
         return null; // Handle the error as needed
     }
 }
-
 exports.getBusinessTimingsAndGenerateSlots = async (req, res) => {
-    const { barberId, subserviceId, userId } = req.body;
+    const { barberId, serviceIds, userId, day, date } = req.body;
 
-    if (!barberId || !subserviceId) {
-        return res.status(400).json({ message: "Missing barberId or subserviceId" });   
+    if (!barberId || !serviceIds || !day || !date) {
+        return res.status(400).json({ message: "Missing barberId, subserviceIds, day, or date" });
     }
 
-    const duration = await fetchDuration(subserviceId); // Fetch duration using the subserviceId
+    const duration = await fetchTotalDuration(serviceIds); // Fetch duration using the subserviceId
 
     if (duration === null) {
         return res.status(404).json({ message: "Subservice not found or duration not available" });
@@ -36,40 +41,38 @@ exports.getBusinessTimingsAndGenerateSlots = async (req, res) => {
         if (user) {
             const businessTimings = user.businessTimings;
             if (businessTimings) {
-                const currentDate = new Date();
-                const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-                const currentDayName = dayNames[(currentDate.getDay() + 6) % 7];
                 const slots = [];
 
                 businessTimings.forEach((timing) => {
-                    if (timing.isOpen && timing.day === currentDayName) {
+                    if (timing.isOpen && timing.day === day) {
                         const startHour = parseInt(timing.startHour);
                         const startMinute = parseInt(timing.startMinute);
                         const endHour = parseInt(timing.endHour);
                         const endMinute = parseInt(timing.endMinute);
                         let currentHour = startHour;
                         let currentMinute = startMinute;
-                
+
                         while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
                             let slotEndHour = currentHour;
                             let slotEndMinute = currentMinute + duration;
-                
+
                             if (slotEndMinute >= 60) {
                                 slotEndHour += Math.floor(slotEndMinute / 60);
                                 slotEndMinute %= 60;
                             }
-                
+
                             slots.push({
                                 barberId: barberId,
                                 userId: userId,
-                                subserviceId: subserviceId,
-                                day: currentDayName,
+                                serviceIds: serviceIds,
+                                day: day,
+                                date: date, // Add the date to the slot
                                 startHour: currentHour.toString(),
                                 startMinute: currentMinute.toString(),
                                 endHour: slotEndHour.toString(),
                                 endMinute: slotEndMinute.toString(),
                             });
-                
+
                             currentHour = slotEndHour;
                             currentMinute = slotEndMinute;
                         }
@@ -93,9 +96,11 @@ exports.getBusinessTimingsAndGenerateSlots = async (req, res) => {
 };
 
 
+
+
 exports.createBooking = async (req, res) => {
     try {
-        const { barberId, userId, serviceId, date, startHour, startMinute, endHour, endMinute } = req.body;
+        const { barberId, userId, serviceIds, date, startHour, startMinute, endHour, endMinute } = req.body;
 
         // Check if the user and barber exist
         const barber = await UserModel.findById(barberId);
@@ -104,17 +109,17 @@ exports.createBooking = async (req, res) => {
             return res.status(404).json({ message: "Barber or user not found" });
         }
 
-        // Check if the selected service exists
-        const service = await SubserviceModel.findById(serviceId);
-        if (!service) {
-            return res.status(404).json({ message: "Service not found" });
+        // Check if the selected services exist
+        const services = await SubserviceModel.find({ _id: { $in: serviceIds } });
+        if (services.length !== serviceIds.length) {
+            return res.status(404).json({ message: "One or more services not found" });
         }
 
         // Create a new booking
         const newBooking = new BookingModel({
             barberId,
             userId,
-            service: serviceId,
+            services: serviceIds,
             date,
             startHour,
             startMinute,
