@@ -22,7 +22,7 @@ exports.getBusinessTimingsAndGenerateSlots = async (req, res) => {
     const { barberId, subserviceId, userId } = req.body;
 
     if (!barberId || !subserviceId) {
-        return res.status(400).json({ message: "Missing barberId or subserviceId in the request body" });
+        return res.status(400).json({ message: "Missing barberId or subserviceId" });   
     }
 
     const duration = await fetchDuration(subserviceId); // Fetch duration using the subserviceId
@@ -36,36 +36,40 @@ exports.getBusinessTimingsAndGenerateSlots = async (req, res) => {
         if (user) {
             const businessTimings = user.businessTimings;
             if (businessTimings) {
+                const currentDate = new Date();
+                const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+                const currentDayName = dayNames[(currentDate.getDay() + 6) % 7];
                 const slots = [];
 
                 businessTimings.forEach((timing) => {
-                    if (timing.isOpen) {
+                    if (timing.isOpen && timing.day === currentDayName) {
                         const startHour = parseInt(timing.startHour);
                         const startMinute = parseInt(timing.startMinute);
                         const endHour = parseInt(timing.endHour);
                         const endMinute = parseInt(timing.endMinute);
                         let currentHour = startHour;
                         let currentMinute = startMinute;
-
+                
                         while (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
                             let slotEndHour = currentHour;
                             let slotEndMinute = currentMinute + duration;
-
+                
                             if (slotEndMinute >= 60) {
                                 slotEndHour += Math.floor(slotEndMinute / 60);
                                 slotEndMinute %= 60;
                             }
-
+                
                             slots.push({
                                 barberId: barberId,
                                 userId: userId,
                                 subserviceId: subserviceId,
+                                day: currentDayName,
                                 startHour: currentHour.toString(),
                                 startMinute: currentMinute.toString(),
                                 endHour: slotEndHour.toString(),
                                 endMinute: slotEndMinute.toString(),
                             });
-
+                
                             currentHour = slotEndHour;
                             currentMinute = slotEndMinute;
                         }
@@ -73,8 +77,7 @@ exports.getBusinessTimingsAndGenerateSlots = async (req, res) => {
                 });
 
                 res.status(200).json({
-                    message: " slots retrieved successfully",
-                    // businessTimings,
+                    message: "Slots retrieved successfully",
                     slots,
                 });
             } else {
