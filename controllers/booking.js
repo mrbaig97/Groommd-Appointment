@@ -3,7 +3,6 @@ const SubserviceModel = require("../models/subServices");
 const UserModel = require("../models/user");
 
 
-
 async function fetchTotalDuration(serviceIds) {
     try {
         const services = await SubserviceModel.find({ _id: { $in: serviceIds } });
@@ -212,3 +211,13 @@ exports.getAvailableSlots = async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 };
+
+// exports.getBookings = async (req, res) => {
+//     try {
+//         const bookings = await BookingModel.find({});
+//         res.status(200).json({ message: "Bookings retrieved successfully", bookings });
+//     } catch (err) {
+//         console.error(err);
+//         res.status(500).json({ message: "Internal server error" });
+//     }
+// };

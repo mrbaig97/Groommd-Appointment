@@ -1,6 +1,5 @@
 const express = require("express");
 const router = express.Router();
-const UserModel = require("../models/user");
 const bookingController = require("../controllers/booking"); // Adjust the path as needed
 
 // Define the route for creating a booking

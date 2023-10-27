@@ -6,6 +6,14 @@ exports.registerUser = async (req, res) => {
   const role = "user"; // Set the role to "user" for user registration
 
   try {
+    // Check if the email already exists in the database
+    const existingUser = await UserModel.findOne({ email });
+
+    if (existingUser) {
+      return res.status(400).json({ error: "Email already exists" });
+    }
+
+    // If the email doesn't exist, create a new user
     const newUser = new UserModel({
       name,
       email,
@@ -17,12 +25,13 @@ exports.registerUser = async (req, res) => {
     newUser.password = hashedPassword;
     await newUser.save();
 
-    res.status(201).json({ message: "User registration successful" });
+    res.status(201).json({ message: "User registration successful" }); 
   } catch (error) {
     console.error("Error registering user:", error);
     res.status(500).json({ error: "Error registering user" });
   }
 };
+
 
 exports.registerBarber = async (req, res) => {
   const { name, email, password, shopname, businessTimings, services } = req.body;
